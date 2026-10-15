@@ -4,6 +4,7 @@ using AsmResolver.PE.DotNet.Metadata;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
@@ -181,6 +182,9 @@ namespace MelonLoader.Utils
         {
             if (assemblyFile is not null)
             {
+                if (IsGeneratedIl2CppAssembly(assemblyFile))
+                    return (true, null);
+
                 var module = ModuleDefinition.FromFile(assemblyFile);
 
                 var checkResult = CheckAssembly(module);
@@ -190,6 +194,27 @@ namespace MelonLoader.Utils
             }
 
             return (true, null);
+        }
+
+        private static bool IsGeneratedIl2CppAssembly(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return false;
+
+            string fileName;
+            try
+            {
+                fileName = Path.GetFileName(path);
+            }
+            catch
+            {
+                return false;
+            }
+
+            return fileName.StartsWith("Il2Cpp", StringComparison.OrdinalIgnoreCase)
+                   && !fileName.Equals("Il2Cpp.dll", StringComparison.OrdinalIgnoreCase)
+                   && !fileName.StartsWith("Il2CppInterop.", StringComparison.OrdinalIgnoreCase)
+                   && !fileName.Equals("Il2CppAssemblyGenerator.dll", StringComparison.OrdinalIgnoreCase);
         }
 
         internal static (bool, string) VerifyByteArray(byte[] rawAssembly)

@@ -87,6 +87,9 @@ namespace MelonLoader.Fixes.Dotnet
         {
             //MelonDebug.Msg($"[ALC FromPath] Validating {ilPath}...");
 
+            if (IsGeneratedIl2CppAssembly(ilPath))
+                return true;
+
             //Simple pass-to-verifier and throw if bad.
             var (ok, reason) = AssemblyVerifier.VerifyFile(ilPath);
             if (!ok)
@@ -96,6 +99,37 @@ namespace MelonLoader.Fixes.Dotnet
 
             //Continue to run the original runtime QCall.
             return true;
+        }
+
+        private static bool IsGeneratedIl2CppAssembly(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return false;
+
+            try
+            {
+                string fullPath = Path.GetFullPath(path);
+                string fileName = Path.GetFileName(fullPath);
+
+                if (fileName.StartsWith("Il2Cpp", StringComparison.OrdinalIgnoreCase)
+                    && !fileName.StartsWith("Il2CppInterop.", StringComparison.OrdinalIgnoreCase)
+                    && !fileName.Equals("Il2CppAssemblyGenerator.dll", StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                string il2CppAssembliesDirectory = Path.GetFullPath(MelonEnvironment.Il2CppAssembliesDirectory);
+
+                if (!il2CppAssembliesDirectory.EndsWith(Path.DirectorySeparatorChar)
+                    && !il2CppAssembliesDirectory.EndsWith(Path.AltDirectorySeparatorChar))
+                    il2CppAssembliesDirectory += Path.DirectorySeparatorChar;
+
+                return fullPath.StartsWith(il2CppAssembliesDirectory, StringComparison.OrdinalIgnoreCase)
+                       && (fullPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+                           || fullPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static unsafe bool PreAlcLoadFromStream(IntPtr ptrAssemblyArray, int iAssemblyArrayLen)
