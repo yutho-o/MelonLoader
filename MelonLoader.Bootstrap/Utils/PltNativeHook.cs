@@ -12,8 +12,10 @@ namespace MelonLoader.Bootstrap.Utils
         internal string? ModuleFilePath { get; private set; }
         internal string? FunctionName { get; private set; }
 
-        private static readonly string? PlayerFileName = Process.GetCurrentProcess().Modules.OfType<ProcessModule>()
-            .FirstOrDefault(x => x.FileName.Contains("UnityPlayer"))?.FileName;
+        private static readonly ProcessModule? PlayerModule = Process.GetCurrentProcess().Modules.OfType<ProcessModule>()
+            .FirstOrDefault(x => x.FileName.Contains("UnityPlayer"));
+        private static readonly string? PlayerFileName = PlayerModule?.FileName;
+
         internal static PltNativeHook<T>? RedirectUnityPlayer(string? functionName, nint detour)
         {
             PltNativeHook<T>? newHook = null;
@@ -34,7 +36,16 @@ namespace MelonLoader.Bootstrap.Utils
             }
             else
 #endif
-            newHook = new(PlayerFileName, functionName, detour);
+            // On passe le handle plutôt que le chemin : plthook_open résout le
+            // module via GetModuleHandleExA, une API ANSI, alors que le
+            // marshalling est en UTF-8. Un compte Windows nommé "Tomáš" partait
+            // donc en octets UTF-8 relus en CP_ACP, aucun module ne
+            // correspondait, et tous les hooks du loader échouaient avec
+            // "Cannot get module ...: The specified module could not be found."
+            // plthook_open_by_handle ne prend aucune chaîne.
+            newHook = PlayerModule is not null
+                ? new(PlayerModule.BaseAddress, functionName, detour)
+                : new(PlayerFileName, functionName, detour);
 
             return newHook;
         }
@@ -90,7 +101,13 @@ namespace MelonLoader.Bootstrap.Utils
 
             if (!pltHookOpened)
             {
-                MelonLogger.LogError($"plthook_open error: {Marshal.PtrToStringAnsi(PltHook.PlthookError())}");
+                // Dire quel hook a échoué : sans ça, le rapport de crash ne
+                // permet pas de savoir quelle fonction n'a pas été redirigée.
+                var target = ModuleHandle != IntPtr.Zero
+                    ? $"handle 0x{ModuleHandle:X}"
+                    : ModuleFilePath;
+                MelonLogger.LogError($"plthook_open error for {FunctionName} in {target}: " +
+                                     $"{Marshal.PtrToStringAnsi(PltHook.PlthookError())}");
                 return false;
             }
             return true;
@@ -122,8 +139,10 @@ namespace MelonLoader.Bootstrap.Utils
 
         internal override void HookDetach()
         {
-            if (string.IsNullOrEmpty(ModuleFilePath)
-                || string.IsNullOrWhiteSpace(ModuleFilePath))
+            // Un hook ouvert par handle n'a pas de ModuleFilePath : exiger le
+            // chemin ici rendait le détachement silencieusement inopérant.
+            if (ModuleHandle == IntPtr.Zero
+                && string.IsNullOrWhiteSpace(ModuleFilePath))
                 return;
             if (string.IsNullOrEmpty(FunctionName)
                 || string.IsNullOrWhiteSpace(FunctionName))
