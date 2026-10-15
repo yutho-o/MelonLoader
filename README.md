@@ -1,8 +1,8 @@
 > [!NOTE]
 > **This is a patched fork of MelonLoader used by [CairnMP](https://github.com/CairnMP/cairnmp-mod), not an official build.**
-> The `cairnmp` branch is the upstream `v0.7.2` tag plus two commits:
+> The `cairnmp` branch is the upstream `v0.7.2` tag plus two patches:
 >
-> - *Hook UnityPlayer by handle so non-ASCII paths load* — on a game path that is not pure ASCII, the loader never starts. The fix is proposed upstream.
+> - *Hook UnityPlayer by handle so non-ASCII paths load* — on a game path that is not pure ASCII, the loader never starts. The fix is proposed upstream in [#1226](https://github.com/LavaGang/MelonLoader/pull/1226).
 > - *Skip verifying the generated Il2Cpp assemblies*.
 >
 > Builds are published as releases of this repository (`v0.7.2-cairnmp.N`, Windows x64). Once the fix ships in an official MelonLoader release, CairnMP moves back to it and this fork is retired. Report problems with these builds to CairnMP, not to LavaGang.
