@@ -6,6 +6,8 @@ on:
   push:
     tags:
       - '*.*.*'
+      # Published by cairnmp-release.yml instead.
+      - '!*-cairnmp.*'
 
 jobs:
   fix_tag_version:
