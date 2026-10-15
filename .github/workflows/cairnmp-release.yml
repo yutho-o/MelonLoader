@@ -1,0 +1,48 @@
+# Builds this branch (upstream MelonLoader plus the CairnMP patches) for Windows x64 and
+# publishes it as a GitHub release when a `v<melonloader>-cairnmp.<n>` tag is pushed.
+# Cairn is a Windows game: macOS and Linux players run it under Wine with this same build.
+name: CairnMP release
+
+on:
+  push:
+    tags: ['v*-cairnmp.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build Release for win-x64
+        run: dotnet build --no-restore -c Release -p:Platform="x64"
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Push-Location Output/Release/win-x64
+          7z a -tzip "$env:GITHUB_WORKSPACE/MelonLoader.x64.zip" * | Out-Null
+          Pop-Location
+          $hash = (Get-FileHash -Algorithm SHA256 MelonLoader.x64.zip).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("MelonLoader.x64.zip.sha256", "$hash  MelonLoader.x64.zip`n")
+          Get-Content MelonLoader.x64.zip.sha256
+
+      - name: Publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" MelonLoader.x64.zip MelonLoader.x64.zip.sha256 \
+            --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "MelonLoader $TAG" \
+            --notes "Upstream MelonLoader with the patches listed in the README of the \`cairnmp\` branch. Unzip next to the game executable. Not an official MelonLoader release."
